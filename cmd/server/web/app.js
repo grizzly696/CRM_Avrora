@@ -563,6 +563,15 @@ $('#department-form').addEventListener('submit', async (event) => {
   } catch (error) { showToast(error.message, true); }
 });
 document.addEventListener('click', (event) => {
+  const closeButton = event.target.closest('[data-dialog-close]');
+  if (closeButton) {
+    const dialog = closeButton.closest('dialog');
+    if (dialog) {
+      dialog.querySelector('form')?.reset();
+      dialog.close();
+    }
+    return;
+  }
   const contact = event.target.closest('[data-contact-open]');
   if (!contact) return;
   const item = state.contacts.find((candidate) => candidate.id === Number(contact.dataset.contactOpen));
@@ -609,6 +618,9 @@ $('#vulnerability-form').addEventListener('submit', async (event) => {
 });
 $('#task-form').addEventListener('submit', async (event) => {
   event.preventDefault();
+  // A cancel/close action must never create a task, even if a future markup change
+  // accidentally turns the close control back into a submit button.
+  if (event.submitter?.matches('[data-dialog-close], [value="cancel"]')) return;
   const formElement = event.currentTarget;
   const form = new FormData(formElement);
   const assignment = form.get('assignment');
