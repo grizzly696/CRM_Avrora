@@ -211,3 +211,32 @@ func TestEmployeeDirectoryAccess(t *testing.T) {
 func jsonNumber(value int64) string {
 	return strconv.FormatInt(value, 10)
 }
+
+func TestDepartmentCatalogCoversEveryDepartment(t *testing.T) {
+	api := newAPITest(t)
+	response := api.request(t, api.users["Менеджмент"], http.MethodGet, "/api/department/catalog", "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("catalog status = %d, want %d: %s", response.Code, http.StatusOK, response.Body)
+	}
+	var catalog struct {
+		Roles       []string            `json:"roles"`
+		KindsByRole map[string][]string `json:"kindsByRole"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &catalog); err != nil {
+		t.Fatalf("decode department catalog: %v", err)
+	}
+	if len(catalog.Roles) != 6 || len(catalog.KindsByRole) != 6 {
+		t.Fatalf("catalog has %d roles and %d role catalogs; want 6 each", len(catalog.Roles), len(catalog.KindsByRole))
+	}
+	for _, role := range catalog.Roles {
+		kinds := catalog.KindsByRole[role]
+		if len(kinds) < 10 {
+			t.Errorf("role %q has %d work types; want at least 10", role, len(kinds))
+		}
+		for _, kind := range kinds {
+			if !validKind(role, kind) {
+				t.Errorf("catalog kind %q is not accepted for role %q", kind, role)
+			}
+		}
+	}
+}

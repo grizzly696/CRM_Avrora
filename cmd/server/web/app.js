@@ -11,6 +11,7 @@ const state = {
   vulnerabilities: [],
   tasks: { items: [], users: [], groups: [] },
   departmentItems: [],
+  departmentCatalog: { roles: [], kindsByRole: {} },
   employees: [],
   drive: { folderId: 0, folders: [], files: [] },
   chats: { items: [], users: [] },
