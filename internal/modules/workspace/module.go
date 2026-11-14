@@ -33,9 +33,14 @@ type Message struct {
 	Text      string    `json:"text"`
 	CreatedAt time.Time `json:"createdAt"`
 }
-type Module struct{ db *sql.DB }
+type Module struct {
+	db   *sql.DB
+	auth *auth.Service
+}
 
-func New(db *sql.DB) *Module   { return &Module{db: db} }
+func New(db *sql.DB, authService *auth.Service) *Module {
+	return &Module{db: db, auth: authService}
+}
 func (m *Module) Name() string { return "workspace" }
 func (m *Module) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/workspace/files", m.listFiles)
@@ -258,18 +263,21 @@ func (m *Module) listMessages(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Module) createMessage(w http.ResponseWriter, r *http.Request) {
+	user, ok := m.auth.User(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+		return
+	}
 	var input struct {
-		Author string `json:"author"`
-		Role   string `json:"role"`
-		Text   string `json:"text"`
+		Text string `json:"text"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil || strings.TrimSpace(input.Text) == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "text is required"})
 		return
 	}
-	input.Author, input.Role, input.Text = strings.TrimSpace(input.Author), strings.TrimSpace(input.Role), strings.TrimSpace(input.Text)
+	input.Text = strings.TrimSpace(input.Text)
 	created := time.Now().UTC()
-	result, err := m.db.Exec(`INSERT INTO messages (author, role, text, created_at) VALUES (?, ?, ?, ?)`, input.Author, input.Role, input.Text, created.Format(time.RFC3339Nano))
+	result, err := m.db.Exec(`INSERT INTO messages (author, role, text, created_at) VALUES (?, ?, ?, ?)`, user.Name, user.Role, input.Text, created.Format(time.RFC3339Nano))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create message"})
 		return
