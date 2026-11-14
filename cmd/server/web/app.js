@@ -560,6 +560,11 @@ $('#department-form').addEventListener('submit', async (event) => {
   } catch (error) { showToast(error.message, true); }
 });
 document.addEventListener('click', (event) => {
+  const closeButton = event.target.closest('[data-dialog-close]');
+  if (closeButton) {
+    closeButton.closest('dialog')?.close();
+    return;
+  }
   const contact = event.target.closest('[data-contact-open]');
   if (!contact) return;
   const item = state.contacts.find((candidate) => candidate.id === Number(contact.dataset.contactOpen));
