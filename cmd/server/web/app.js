@@ -354,7 +354,7 @@ async function loadDepartmentItems() {
 
 async function loadData() {
   try {
-    const [contacts, stats, files, messages, tasks, drive, chats, departmentItems] = await Promise.all([
+    const [contacts, stats, files, messages, tasks, drive, chats, departmentItems, departmentCatalog] = await Promise.all([
       request('/api/contacts'),
       request('/api/stats'),
       request('/api/workspace/files'),
@@ -363,6 +363,7 @@ async function loadData() {
       request('/api/drive?folderId=0'),
       request('/api/chats'),
       request('/api/department/items'),
+      request('/api/department/catalog'),
     ]);
     state.contacts = contacts;
     state.files = files;
@@ -370,6 +371,7 @@ async function loadData() {
     state.stats = stats;
     state.tasks = { items: tasks.tasks, users: tasks.users, groups: tasks.groups };
     state.departmentItems = departmentItems;
+    state.departmentCatalog = departmentCatalog;
     if (state.role === 'hr' || state.role === 'manager' || state.user?.isAdmin) {
       state.employees = await request('/api/department/employees');
     }
