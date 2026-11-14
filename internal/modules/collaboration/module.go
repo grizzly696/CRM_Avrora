@@ -165,7 +165,7 @@ func (m *Module) createFolder(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "name is required"})
 		return
 	}
-	if input.ParentID > 0 && !m.canAccessFolder(user, input.ParentID) {
+	if input.ParentID < 0 || (input.ParentID > 0 && !m.canEditFolder(user, input.ParentID)) {
 		writeJSON(w, 403, map[string]string{"error": "folder access denied"})
 		return
 	}
@@ -182,8 +182,8 @@ func (m *Module) createFolder(w http.ResponseWriter, r *http.Request) {
 func (m *Module) uploadFile(w http.ResponseWriter, r *http.Request) {
 	user, _ := m.auth.User(r)
 	folderID, _ := strconv.Atoi(r.PathValue("id"))
-	if !m.canAccessFolder(user, folderID) {
-		writeJSON(w, 403, map[string]string{"error": "folder access denied"})
+	if !m.canEditFolder(user, folderID) {
+		writeJSON(w, 403, map[string]string{"error": "folder edit denied"})
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 50<<20)
@@ -335,7 +335,11 @@ func (m *Module) downloadFile(w http.ResponseWriter, r *http.Request) {
 
 func (m *Module) grantFolderAccess(w http.ResponseWriter, r *http.Request) {
 	user, _ := m.auth.User(r)
-	folderID, _ := strconv.Atoi(r.PathValue("id"))
+	folderID, parseErr := strconv.Atoi(r.PathValue("id"))
+	if parseErr != nil || folderID < 1 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid folder id"})
+		return
+	}
 	if !m.isFolderOwner(user, folderID) {
 		writeJSON(w, 403, map[string]string{"error": "only folder owner or admin can change access"})
 		return
@@ -352,7 +356,26 @@ func (m *Module) grantFolderAccess(w http.ResponseWriter, r *http.Request) {
 	if input.Permission == "" {
 		input.Permission = "viewer"
 	}
-	_, err := m.db.Exec(`INSERT OR REPLACE INTO folder_access (folder_id, user_id, role, permission) VALUES (NULLIF(?, 0), NULLIF(?, 0), ?, ?)`, folderID, input.UserID, strings.TrimSpace(input.Role), input.Permission)
+	if input.Permission != "viewer" && input.Permission != "editor" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "permission must be viewer or editor"})
+		return
+	}
+	input.Role = strings.TrimSpace(input.Role)
+	if input.UserID > 0 && input.Role != "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "choose a user or a role, not both"})
+		return
+	}
+	if input.UserID > 0 {
+		var active int
+		if err := m.db.QueryRow(`SELECT COUNT(*) FROM users WHERE id = ? AND status = 'active'`, input.UserID).Scan(&active); err != nil || active == 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "active user not found"})
+			return
+		}
+	} else if !validFolderRole(input.Role) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown role"})
+		return
+	}
+	_, err := m.db.Exec(`INSERT OR REPLACE INTO folder_access (folder_id, user_id, role, permission) VALUES (?, NULLIF(?, 0), ?, ?)`, folderID, input.UserID, input.Role, input.Permission)
 	if err != nil {
 		writeJSON(w, 500, map[string]string{"error": "failed to grant access"})
 		return
@@ -575,6 +598,15 @@ func (m *Module) createChatMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	id, _ := result.LastInsertId()
 	writeJSON(w, 201, map[string]any{"id": id, "text": strings.TrimSpace(input.Text)})
+}
+
+func validFolderRole(role string) bool {
+	switch role {
+	case "Менеджмент", "Кадры", "Разработка", "Информационная безопасность", "Бухгалтерия", "Маркетинг", "Продажи":
+		return true
+	default:
+		return false
+	}
 }
 
 func (m *Module) canAccessFolder(user auth.User, folderID int) bool {
