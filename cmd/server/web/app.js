@@ -11,6 +11,7 @@ const state = {
   vulnerabilities: [],
   tasks: { items: [], users: [], groups: [] },
   departmentItems: [],
+  departmentCatalog: { roles: [], kindsByRole: {} },
   employees: [],
   drive: { folderId: 0, folders: [], files: [] },
   chats: { items: [], users: [] },
@@ -47,32 +48,32 @@ function statusLabel(status) {
 
 const roles = {
   manager: {
-    label: 'Менеджмент', title: 'Центр управления командой', description: 'Задачи отделов, клиенты и ключевые показатели команды.',
-    items: [['Проверить работу отделов', 'Сводка процессов и статусов', 'department'], ['Назначить задачу команде', 'Поручения по ролям и сотрудникам', 'tasks'], ['Посмотреть клиентскую воронку', 'Контакты и коммерческие возможности', 'pipeline']],
+    label: 'Менеджмент', title: 'Центр управления командой', description: 'Контроль отделов, исполнение планов, клиентский портфель и управленческие решения.',
+    items: [['Контроль показателей отделов', 'Открытые процессы, просрочки и результаты', 'department'], ['Планирование и поручения', 'Постановка задач и контроль исполнения', 'tasks'], ['Клиентский портфель', 'Воронка, выручка и ключевые контакты', 'pipeline'], ['Командные коммуникации', 'Общие чаты и координация', 'messenger'], ['Управленческие документы', 'Планы, регламенты и отчёты', 'drive']],
   },
   hr: {
-    label: 'Кадры · HR', title: 'Рабочее место HR', description: 'Подбор, адаптация, отпуска и кадровые документы.',
-    items: [['Вести вакансии и кандидатов', 'Этапы подбора и обратная связь', 'department'], ['Организовать адаптацию', 'План выхода и контрольные точки', 'department'], ['Обрабатывать кадровые запросы', 'Отпуска и документы сотрудников', 'department']],
+    label: 'Кадры · HR', title: 'Рабочее место HR', description: 'Полный цикл работы с персоналом: подбор, адаптация, развитие, отсутствие и кадровое делопроизводство.',
+    items: [['Подбор персонала', 'Вакансии, кандидаты, интервью и офферы', 'department'], ['Адаптация и испытательный срок', 'Планы выхода и контрольные точки', 'department'], ['Кадровые процессы', 'Отпуска, больничные и запросы сотрудников', 'department'], ['Обучение и оценка', 'Развитие компетенций и обратная связь', 'department'], ['Штат и сотрудники', 'Список сотрудников и статусы', 'department']],
   },
   developer: {
-    label: 'Разработка', title: 'Рабочее место разработчика', description: 'Бэклог, дефекты, релизы и технический долг.',
-    items: [['Разбирать задачи и дефекты', 'Бэклог и приоритеты команды', 'tasks'], ['Готовить релизы', 'Контроль изменений и готовности', 'tasks'], ['Документировать технические решения', 'Материалы команды на общем диске', 'drive']],
+    label: 'Разработка', title: 'Рабочее место разработчика', description: 'Планирование разработки, качество кода, релизы, эксплуатация и техническая документация.',
+    items: [['Бэклог разработки', 'Задачи, приоритеты и назначение', 'tasks'], ['Дефекты и инциденты', 'Разбор ошибок и устранение причин', 'department'], ['Релизы и изменения', 'Готовность выпусков и контроль внедрения', 'department'], ['Технические решения', 'Архитектура, code review и документация', 'drive'], ['Командная синхронизация', 'Обсуждение блокеров и релизов', 'messenger']],
   },
   security: {
-    label: 'Информационная безопасность', title: 'Рабочее место специалиста ИБ', description: 'Уязвимости, инциденты, доступы и проверки безопасности.',
-    items: [['Проверять уязвимости', 'Критичность, статус и владелец устранения', 'vulnerabilities'], ['Фиксировать инциденты и риски', 'Единый журнал рабочих проверок', 'department'], ['Контролировать доступы', 'Проверки прав на файлы и чаты', 'drive']],
+    label: 'Информационная безопасность', title: 'Рабочее место специалиста ИБ', description: 'Управление уязвимостями, инцидентами, рисками, доступами и соответствием требованиям безопасности.',
+    items: [['Реестр уязвимостей', 'Критичность, владелец и устранение', 'vulnerabilities'], ['Инциденты и реагирование', 'Регистрация, расследование и меры', 'department'], ['Аудит доступов', 'Права пользователей и контроль изменений', 'department'], ['Риски и соответствие', 'Оценка угроз и проверки мер защиты', 'department'], ['Политики и инструкции', 'Регламенты и планы восстановления', 'drive']],
   },
   accountant: {
-    label: 'Бухгалтерия', title: 'Рабочее место бухгалтера', description: 'Счета, платежи, сверки и финансовая отчётность.',
-    items: [['Вести счета и платежи', 'Контрагент, сумма и срок оплаты', 'department'], ['Проводить сверки', 'Статусы операций и расхождения', 'department'], ['Готовить отчёты', 'Рабочие документы и контроль сроков', 'drive']],
+    label: 'Бухгалтерия', title: 'Рабочее место бухгалтера', description: 'Учёт первичных документов, счета, платежи, сверки, налоги, бюджеты и закрытие периодов.',
+    items: [['Счета и первичные документы', 'Входящие и исходящие документы', 'department'], ['Платежи и календарь', 'Суммы, сроки и контроль исполнения', 'department'], ['Сверки и закрытие периода', 'Расхождения и контрольные операции', 'department'], ['Бюджет и отчётность', 'Финансовые показатели и отчёты', 'department'], ['Финансовый архив', 'Договоры, акты и отчётные документы', 'drive']],
   },
   marketing: {
-    label: 'Маркетинг', title: 'Рабочее место маркетолога', description: 'Кампании, контент-план, аналитика и маркетинговые лиды.',
-    items: [['Планировать кампании', 'Аудитория, каналы, бюджет и KPI', 'department'], ['Вести контент-план', 'Материалы и календарь публикаций', 'department'], ['Оценивать результаты', 'Метрики и качество лидов', 'department']],
+    label: 'Маркетинг', title: 'Рабочее место маркетолога', description: 'Маркетинговая стратегия, кампании, контент, каналы привлечения, аналитика и эффективность бюджета.',
+    items: [['Кампании и медиаплан', 'Аудитории, каналы, бюджеты и KPI', 'department'], ['Контент и публикации', 'Редакционный календарь и материалы', 'department'], ['Исследования рынка', 'Аудитория, конкуренты и позиционирование', 'department'], ['Лидогенерация и конверсия', 'Качество лидов и передача в продажи', 'contacts'], ['Маркетинговая аналитика', 'Результаты кампаний и отчётность', 'department']],
   },
   sales: {
-    label: 'Продажи', title: 'Рабочее место специалиста по продажам', description: 'Клиенты, лиды, коммерческие предложения и воронка сделок.',
-    items: [['Обрабатывать контакты и лиды', 'История и данные компаний в CRM', 'contacts'], ['Вести сделки по этапам', 'Потенциал и состояние воронки', 'pipeline'], ['Планировать следующие шаги', 'Звонки, предложения и задачи', 'tasks']],
+    label: 'Продажи', title: 'Рабочее место специалиста по продажам', description: 'Управление лидами и сделками, коммуникации, коммерческие предложения, договоры и прогноз продаж.',
+    items: [['Лиды и квалификация', 'Новые обращения и потребности клиентов', 'contacts'], ['Воронка и сделки', 'Этапы, суммы и следующие действия', 'pipeline'], ['Встречи и коммуникации', 'Звонки, встречи и история контактов', 'messenger'], ['Предложения и договоры', 'Подготовка и согласование условий', 'department'], ['План продаж', 'Задачи, прогноз и контроль результата', 'tasks']],
   },
 };
 
@@ -288,13 +289,13 @@ function renderAdmin() {
 }
 
 const departmentRoles = ['Кадры', 'Разработка', 'Информационная безопасность', 'Бухгалтерия', 'Маркетинг', 'Продажи'];
-const departmentKinds = {
-  'Кадры': ['Вакансия', 'Кандидат', 'Адаптация', 'Отпуск', 'Документ'],
-  'Разработка': ['Задача', 'Дефект', 'Релиз', 'Технический долг'],
-  'Информационная безопасность': ['Проверка', 'Инцидент', 'Доступ', 'Риск'],
-  'Бухгалтерия': ['Платёж', 'Счёт', 'Сверка', 'Отчёт'],
-  'Маркетинг': ['Кампания', 'Контент', 'Аналитика', 'Лид'],
-  'Продажи': ['Сделка', 'Звонок', 'Предложение', 'Задача'],
+const defaultDepartmentKinds = {
+  'Кадры': ['Вакансия', 'Кандидат', 'Собеседование', 'Оффер', 'Адаптация', 'Испытательный срок', 'Оценка сотрудника', 'Отпуск', 'Больничный', 'Кадровый документ', 'Обучение', 'Кадровый запрос'],
+  'Разработка': ['Задача', 'Дефект', 'Техническое исследование', 'Архитектурное решение', 'Code review', 'Релиз', 'Инцидент эксплуатации', 'Технический долг', 'Автоматизация', 'Документация', 'Тестирование', 'Обновление инфраструктуры'],
+  'Информационная безопасность': ['Проверка безопасности', 'Уязвимость', 'Инцидент ИБ', 'Запрос доступа', 'Аудит доступа', 'Оценка риска', 'Модель угроз', 'Проверка соответствия', 'Реагирование', 'Обучение безопасности', 'План восстановления', 'Контроль меры защиты'],
+  'Бухгалтерия': ['Счёт входящий', 'Счёт исходящий', 'Платёж', 'Платёжный календарь', 'Сверка', 'Акт', 'Накладная', 'Налоговая декларация', 'Закрытие периода', 'Бюджет', 'Финансовый отчёт', 'Запрос первичных документов'],
+  'Маркетинг': ['Маркетинговая кампания', 'Контент-план', 'Публикация', 'Рекламный креатив', 'Медиаплан', 'Исследование аудитории', 'Конкурентный анализ', 'Маркетинговая аналитика', 'Лидогенерация', 'SEO-задача', 'Мероприятие', 'Отчёт по KPI'],
+  'Продажи': ['Новый лид', 'Квалификация лида', 'Сделка', 'Звонок', 'Встреча', 'Коммерческое предложение', 'Договор', 'Согласование скидки', 'Продление', 'Повторная продажа', 'Прогноз продаж', 'Работа с возражением'],
 };
 
 function renderDepartmentItems() {
@@ -303,7 +304,7 @@ function renderDepartmentItems() {
   const roleField = $('#department-role-field');
   if (roleField) {
     roleField.hidden = !isManager;
-    $('#department-role').innerHTML = departmentRoles.map((item) => `<option value="${escapeHTML(item)}">${escapeHTML(item)}</option>`).join('');
+    $('#department-role').innerHTML = (state.departmentCatalog?.roles || departmentRoles).map((item) => `<option value="${escapeHTML(item)}">${escapeHTML(item)}</option>`).join('');
   }
   const title = role === 'Менеджмент' ? 'Работа всех отделов' : `Работа отдела · ${roles[state.role].label}`;
   $('#department-title').textContent = title;
@@ -333,7 +334,7 @@ function renderDepartmentItems() {
 function renderDepartmentKinds(role) {
   const kindSelect = $('#department-kind');
   if (!kindSelect) return;
-  kindSelect.innerHTML = (departmentKinds[role] || []).map((kind) => `<option value="${escapeHTML(kind)}">${escapeHTML(kind)}</option>`).join('');
+  kindSelect.innerHTML = ((state.departmentCatalog?.kindsByRole || defaultDepartmentKinds)[role] || []).map((kind) => `<option value="${escapeHTML(kind)}">${escapeHTML(kind)}</option>`).join('');
 }
 
 function renderEmployeeDirectory() {
@@ -353,7 +354,7 @@ async function loadDepartmentItems() {
 
 async function loadData() {
   try {
-    const [contacts, stats, files, messages, tasks, drive, chats, departmentItems] = await Promise.all([
+    const [contacts, stats, files, messages, tasks, drive, chats, departmentItems, departmentCatalog] = await Promise.all([
       request('/api/contacts'),
       request('/api/stats'),
       request('/api/workspace/files'),
@@ -362,6 +363,7 @@ async function loadData() {
       request('/api/drive?folderId=0'),
       request('/api/chats'),
       request('/api/department/items'),
+      request('/api/department/catalog'),
     ]);
     state.contacts = contacts;
     state.files = files;
@@ -369,6 +371,7 @@ async function loadData() {
     state.stats = stats;
     state.tasks = { items: tasks.tasks, users: tasks.users, groups: tasks.groups };
     state.departmentItems = departmentItems;
+    state.departmentCatalog = departmentCatalog;
     if (state.role === 'hr' || state.role === 'manager' || state.user?.isAdmin) {
       state.employees = await request('/api/department/employees');
     }
@@ -560,6 +563,15 @@ $('#department-form').addEventListener('submit', async (event) => {
   } catch (error) { showToast(error.message, true); }
 });
 document.addEventListener('click', (event) => {
+  const closeButton = event.target.closest('[data-dialog-close]');
+  if (closeButton) {
+    const dialog = closeButton.closest('dialog');
+    if (dialog) {
+      dialog.querySelector('form')?.reset();
+      dialog.close();
+    }
+    return;
+  }
   const contact = event.target.closest('[data-contact-open]');
   if (!contact) return;
   const item = state.contacts.find((candidate) => candidate.id === Number(contact.dataset.contactOpen));
@@ -606,6 +618,9 @@ $('#vulnerability-form').addEventListener('submit', async (event) => {
 });
 $('#task-form').addEventListener('submit', async (event) => {
   event.preventDefault();
+  // A cancel/close action must never create a task, even if a future markup change
+  // accidentally turns the close control back into a submit button.
+  if (event.submitter?.matches('[data-dialog-close], [value="cancel"]')) return;
   const formElement = event.currentTarget;
   const form = new FormData(formElement);
   const assignment = form.get('assignment');
