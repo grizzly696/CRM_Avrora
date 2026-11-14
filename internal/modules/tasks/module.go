@@ -48,7 +48,7 @@ func (m *Module) Routes(mux *http.ServeMux) {
 
 func (m *Module) list(w http.ResponseWriter, r *http.Request) {
 	user, _ := m.auth.User(r)
-	rows, err := m.db.Query(`SELECT t.id, t.title, t.description, t.priority, t.status, t.assignee_id, COALESCE(u.name, ''), t.group_role, t.created_by, t.created_at, t.updated_at FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.assignee_id = ? OR t.group_role = ? OR t.created_by = ? OR ? = 1 ORDER BY CASE t.priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, t.updated_at DESC`, user.ID, user.Role, user.ID, boolInt(user.IsAdmin))
+	rows, err := m.db.Query(`SELECT t.id, t.title, t.description, t.priority, t.status, t.assignee_id, COALESCE(u.name, ''), t.group_role, t.created_by, t.created_at, t.updated_at FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id WHERE t.assignee_id = ? OR t.group_role = ? OR t.created_by = ? OR ? = 1 OR ? = 1 ORDER BY CASE t.priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, t.updated_at DESC`, user.ID, user.Role, user.ID, boolInt(user.IsAdmin), boolInt(user.Role == "Менеджмент"))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list tasks"})
 		return
@@ -165,7 +165,7 @@ func (m *Module) update(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid status"})
 		return
 	}
-	result, err := m.db.Exec(`UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND (assignee_id = ? OR created_by = ? OR ? = 1)`, input.Status, time.Now().UTC().Format(time.RFC3339Nano), id, user.ID, user.ID, boolInt(user.IsAdmin))
+	result, err := m.db.Exec(`UPDATE tasks SET status = ?, updated_at = ? WHERE id = ? AND (assignee_id = ? OR created_by = ? OR ? = 1 OR ? = 1)`, input.Status, time.Now().UTC().Format(time.RFC3339Nano), id, user.ID, user.ID, boolInt(user.IsAdmin), boolInt(user.Role == "Менеджмент"))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to update task"})
 		return

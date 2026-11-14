@@ -26,11 +26,16 @@ type AuditEvent struct {
 	Target    string    `json:"target"`
 	CreatedAt time.Time `json:"createdAt"`
 }
-type Module struct{ db *sql.DB }
+type Module struct {
+	db   *sql.DB
+	auth *auth.Service
+}
 
 var roles = []string{"Менеджмент", "Кадры", "Разработка", "Информационная безопасность", "Бухгалтерия", "Маркетинг", "Продажи"}
 
-func New(db *sql.DB) *Module   { return &Module{db: db} }
+func New(db *sql.DB, authService *auth.Service) *Module {
+	return &Module{db: db, auth: authService}
+}
 func (m *Module) Name() string { return "admin" }
 func (m *Module) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/admin/overview", m.overview)
@@ -89,6 +94,11 @@ func (m *Module) listUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *Module) createUser(w http.ResponseWriter, r *http.Request) {
+	actor, ok := m.auth.User(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+		return
+	}
 	var input struct {
 		Name     string `json:"name"`
 		Email    string `json:"email"`
@@ -99,7 +109,7 @@ func (m *Module) createUser(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name and email are required"})
 		return
 	}
-	input.Name, input.Email, input.Role = strings.TrimSpace(input.Name), strings.TrimSpace(input.Email), strings.TrimSpace(input.Role)
+	input.Name, input.Email, input.Role = strings.TrimSpace(input.Name), strings.ToLower(strings.TrimSpace(input.Email)), strings.TrimSpace(input.Role)
 	if !validRole(input.Role) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown role"})
 		return
@@ -110,7 +120,13 @@ func (m *Module) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	lastSeen := time.Now().UTC()
-	result, err := m.db.Exec(`INSERT INTO users (name, email, role, status, last_seen, password_hash) VALUES (?, ?, ?, 'active', ?, ?)`, input.Name, input.Email, input.Role, lastSeen.Format(time.RFC3339Nano), passwordHash)
+	tx, err := m.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create user"})
+		return
+	}
+	defer tx.Rollback()
+	result, err := tx.ExecContext(r.Context(), `INSERT INTO users (name, email, role, status, last_seen, password_hash) VALUES (?, ?, ?, 'active', ?, ?)`, input.Name, input.Email, input.Role, lastSeen.Format(time.RFC3339Nano), passwordHash)
 	if err != nil {
 		writeJSON(w, http.StatusConflict, map[string]string{"error": "email already exists"})
 		return
@@ -120,16 +136,25 @@ func (m *Module) createUser(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create user"})
 		return
 	}
-	if err = m.addAudit("Алексей Крылов", "Добавил пользователя", input.Name); err != nil {
+	if _, err = tx.ExecContext(r.Context(), `INSERT INTO audit_events (actor, action, target, created_at) VALUES (?, ?, ?, ?)`, actor.Name, "Добавил пользователя", input.Name, lastSeen.Format(time.RFC3339Nano)); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to write audit"})
+		return
+	}
+	if err = tx.Commit(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create user"})
 		return
 	}
 	writeJSON(w, http.StatusCreated, User{ID: int(id), Name: input.Name, Email: input.Email, Role: input.Role, Status: "active", LastSeen: lastSeen})
 }
 
 func (m *Module) updateUser(w http.ResponseWriter, r *http.Request) {
+	actor, ok := m.auth.User(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+		return
+	}
 	id, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil {
+	if err != nil || id < 1 {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
 		return
 	}
@@ -149,19 +174,33 @@ func (m *Module) updateUser(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown status"})
 		return
 	}
-	result, err := m.db.Exec(`UPDATE users SET role = COALESCE(NULLIF(?, ''), role), status = COALESCE(NULLIF(?, ''), status) WHERE id = ?`, input.Role, input.Status, id)
+	if input.Role == "" && input.Status == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "at least one field is required"})
+		return
+	}
+	tx, err := m.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to update user"})
 		return
 	}
-	affected, _ := result.RowsAffected()
+	defer tx.Rollback()
+	result, err := tx.ExecContext(r.Context(), `UPDATE users SET role = COALESCE(NULLIF(?, ''), role), status = COALESCE(NULLIF(?, ''), status) WHERE id = ?`, input.Role, input.Status, id)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to update user"})
+		return
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to update user"})
+		return
+	}
 	if affected == 0 {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
 		return
 	}
 	var user User
 	var lastSeen string
-	err = m.db.QueryRow(`SELECT id, name, email, role, status, last_seen FROM users WHERE id = ?`, id).Scan(&user.ID, &user.Name, &user.Email, &user.Role, &user.Status, &lastSeen)
+	err = tx.QueryRowContext(r.Context(), `SELECT id, name, email, role, status, last_seen FROM users WHERE id = ?`, id).Scan(&user.ID, &user.Name, &user.Email, &user.Role, &user.Status, &lastSeen)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to read user"})
 		return
@@ -171,8 +210,12 @@ func (m *Module) updateUser(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "invalid user date"})
 		return
 	}
-	if err = m.addAudit("Алексей Крылов", "Обновил пользователя", user.Name); err != nil {
+	if _, err = tx.ExecContext(r.Context(), `INSERT INTO audit_events (actor, action, target, created_at) VALUES (?, ?, ?, ?)`, actor.Name, "Обновил пользователя", user.Name, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to write audit"})
+		return
+	}
+	if err = tx.Commit(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to update user"})
 		return
 	}
 	writeJSON(w, http.StatusOK, user)
@@ -207,10 +250,6 @@ func (m *Module) listAudit(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, events)
 }
 
-func (m *Module) addAudit(actor, action, target string) error {
-	_, err := m.db.Exec(`INSERT INTO audit_events (actor, action, target, created_at) VALUES (?, ?, ?, ?)`, actor, action, target, time.Now().UTC().Format(time.RFC3339Nano))
-	return err
-}
 func validRole(role string) bool {
 	for _, item := range roles {
 		if role == item {

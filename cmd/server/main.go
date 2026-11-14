@@ -32,7 +32,7 @@ func main() {
 	mux := http.NewServeMux()
 	authService := auth.New(store.DB)
 	authService.Routes(mux)
-	modules := []platform.Module{admin.New(store.DB), contacts.New(store.DB), workspace.New(store.DB), securitymodule.New(store.DB, authService), tasksmodule.New(store.DB, authService), departments.New(store.DB, authService), collaboration.New(store.DB, authService)}
+	modules := []platform.Module{admin.New(store.DB, authService), contacts.New(store.DB), workspace.New(store.DB, authService), securitymodule.New(store.DB, authService), tasksmodule.New(store.DB, authService), departments.New(store.DB, authService), collaboration.New(store.DB, authService)}
 	for _, module := range modules {
 		module.Routes(mux)
 		log.Printf("module loaded: %s", module.Name())
