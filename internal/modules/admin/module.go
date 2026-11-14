@@ -109,7 +109,7 @@ func (m *Module) createUser(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name and email are required"})
 		return
 	}
-	input.Name, input.Email, input.Role = strings.TrimSpace(input.Name), strings.TrimSpace(input.Email), strings.TrimSpace(input.Role)
+	input.Name, input.Email, input.Role = strings.TrimSpace(input.Name), strings.ToLower(strings.TrimSpace(input.Email)), strings.TrimSpace(input.Role)
 	if !validRole(input.Role) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unknown role"})
 		return
