@@ -562,7 +562,9 @@ $('#department-form').addEventListener('submit', async (event) => {
 document.addEventListener('click', (event) => {
   const closeButton = event.target.closest('[data-dialog-close]');
   if (closeButton) {
-    closeButton.closest('dialog')?.close();
+    const dialog = closeButton.closest('dialog');
+    dialog?.querySelector('form')?.reset();
+    dialog?.close();
     return;
   }
   const contact = event.target.closest('[data-contact-open]');
@@ -611,6 +613,8 @@ $('#vulnerability-form').addEventListener('submit', async (event) => {
 });
 $('#task-form').addEventListener('submit', async (event) => {
   event.preventDefault();
+  // Closing a dialog must never trigger task creation, even if the markup regresses.
+  if (event.submitter?.matches('[data-dialog-close], [value="cancel"]')) return;
   const formElement = event.currentTarget;
   const form = new FormData(formElement);
   const assignment = form.get('assignment');
