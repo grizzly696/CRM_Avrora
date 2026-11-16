@@ -532,7 +532,7 @@ $('#add-department-item').addEventListener('click', () => {
   renderDepartmentKinds(isManager ? $('#department-role').value : state.user.role);
   $('#department-dialog').showModal();
 });
-$('#close-department-dialog').addEventListener('click', () => $('#department-dialog').close());
+
 $('#department-role').addEventListener('change', (event) => renderDepartmentKinds(event.target.value));
 $('#department-items').addEventListener('click', async (event) => {
   const button = event.target.closest('[data-department-status]');
@@ -560,6 +560,13 @@ $('#department-form').addEventListener('submit', async (event) => {
   } catch (error) { showToast(error.message, true); }
 });
 document.addEventListener('click', (event) => {
+  const closeButton = event.target.closest('[data-dialog-close]');
+  if (closeButton) {
+    const dialog = closeButton.closest('dialog');
+    dialog?.querySelector('form')?.reset();
+    dialog?.close();
+    return;
+  }
   const contact = event.target.closest('[data-contact-open]');
   if (!contact) return;
   const item = state.contacts.find((candidate) => candidate.id === Number(contact.dataset.contactOpen));
@@ -575,7 +582,7 @@ document.addEventListener('click', (event) => {
   $('#contact-details-created').textContent = formatDate(item.createdAt);
   $('#contact-details-dialog').showModal();
 });
-$('#close-contact-details').addEventListener('click', () => $('#contact-details-dialog').close());
+
 document.querySelectorAll('.icon-button').forEach((button) => button.addEventListener('click', () => showToast('Новых уведомлений нет')));
 document.querySelectorAll('.avatar-small').forEach((button) => button.addEventListener('click', () => showToast(`${state.user?.name || 'Профиль'} · ${state.user?.role || ''}`)));
 document.querySelectorAll('.activity-panel .more').forEach((button) => button.addEventListener('click', () => showToast('Активность обновлена')));
@@ -606,6 +613,8 @@ $('#vulnerability-form').addEventListener('submit', async (event) => {
 });
 $('#task-form').addEventListener('submit', async (event) => {
   event.preventDefault();
+  // Closing a dialog must never trigger task creation, even if the markup regresses.
+  if (event.submitter?.matches('[data-dialog-close], [value="cancel"]')) return;
   const formElement = event.currentTarget;
   const form = new FormData(formElement);
   const assignment = form.get('assignment');
