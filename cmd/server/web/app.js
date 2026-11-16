@@ -532,7 +532,7 @@ $('#add-department-item').addEventListener('click', () => {
   renderDepartmentKinds(isManager ? $('#department-role').value : state.user.role);
   $('#department-dialog').showModal();
 });
-$('#close-department-dialog').addEventListener('click', () => $('#department-dialog').close());
+
 $('#department-role').addEventListener('change', (event) => renderDepartmentKinds(event.target.value));
 $('#department-items').addEventListener('click', async (event) => {
   const button = event.target.closest('[data-department-status]');
@@ -582,7 +582,7 @@ document.addEventListener('click', (event) => {
   $('#contact-details-created').textContent = formatDate(item.createdAt);
   $('#contact-details-dialog').showModal();
 });
-$('#close-contact-details').addEventListener('click', () => $('#contact-details-dialog').close());
+
 document.querySelectorAll('.icon-button').forEach((button) => button.addEventListener('click', () => showToast('Новых уведомлений нет')));
 document.querySelectorAll('.avatar-small').forEach((button) => button.addEventListener('click', () => showToast(`${state.user?.name || 'Профиль'} · ${state.user?.role || ''}`)));
 document.querySelectorAll('.activity-panel .more').forEach((button) => button.addEventListener('click', () => showToast('Активность обновлена')));
